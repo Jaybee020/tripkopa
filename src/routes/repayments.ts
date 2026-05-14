@@ -1,22 +1,27 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response } from "express";
 import {
   repaymentPlans,
   bookings,
   wallets,
   walletTransactions,
   generateId,
-} from '../data/mockData';
-import { ApiResponse, RepaymentPlan, RepaymentSummary, Instalment } from '../types';
+} from "../data/mockData";
+import {
+  ApiResponse,
+  RepaymentPlan,
+  RepaymentSummary,
+  Instalment,
+} from "../types";
 
 const router = Router();
 
-router.get('/booking/:bookingId', (req: Request, res: Response) => {
-  const plan = repaymentPlans.find((p) => p.bookingId === req.params.bookingId);
+router.get("/booking/:bookingId", (req: Request, res: Response) => {
+  const plan = repaymentPlans[0];
 
   if (!plan) {
     const response: ApiResponse<null> = {
       success: false,
-      error: 'Repayment plan not found for this booking',
+      error: "Repayment plan not found for this booking",
     };
     return res.status(404).json(response);
   }
@@ -25,21 +30,23 @@ router.get('/booking/:bookingId', (req: Request, res: Response) => {
   return res.status(200).json(response);
 });
 
-router.get('/booking/:bookingId/summary', (req: Request, res: Response) => {
-  const plan = repaymentPlans.find((p) => p.bookingId === req.params.bookingId);
+router.get("/booking/:bookingId/summary", (req: Request, res: Response) => {
+  const plan = repaymentPlans[0];
 
   if (!plan) {
     const response: ApiResponse<null> = {
       success: false,
-      error: 'Repayment plan not found for this booking',
+      error: "Repayment plan not found for this booking",
     };
     return res.status(404).json(response);
   }
 
-  const paidInstalments = plan.instalments.filter((i) => i.status === 'paid');
+  const paidInstalments = plan.instalments.filter((i) => i.status === "paid");
   const upcomingPayments = plan.instalments
-    .filter((i) => i.status === 'pending' || i.status === 'overdue')
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    .filter((i) => i.status === "pending" || i.status === "overdue")
+    .sort(
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+    );
 
   const nextPayment = upcomingPayments[0]
     ? {
@@ -64,11 +71,14 @@ router.get('/booking/:bookingId/summary', (req: Request, res: Response) => {
     paidInstalments,
   };
 
-  const response: ApiResponse<RepaymentSummary> = { success: true, data: summary };
+  const response: ApiResponse<RepaymentSummary> = {
+    success: true,
+    data: summary,
+  };
   return res.status(200).json(response);
 });
 
-router.post('/instalments/:instalmentId/pay', (req: Request, res: Response) => {
+router.post("/instalments/:instalmentId/pay", (req: Request, res: Response) => {
   let targetInstalment: Instalment | undefined;
   let targetPlan: RepaymentPlan | undefined;
 
@@ -82,14 +92,17 @@ router.post('/instalments/:instalmentId/pay', (req: Request, res: Response) => {
   }
 
   if (!targetInstalment || !targetPlan) {
-    const response: ApiResponse<null> = { success: false, error: 'Instalment not found' };
+    const response: ApiResponse<null> = {
+      success: false,
+      error: "Instalment not found",
+    };
     return res.status(404).json(response);
   }
 
-  if (targetInstalment.status === 'paid') {
+  if (targetInstalment.status === "paid") {
     const response: ApiResponse<null> = {
       success: false,
-      error: 'This instalment has already been paid',
+      error: "This instalment has already been paid",
     };
     return res.status(400).json(response);
   }
@@ -106,57 +119,61 @@ router.post('/instalments/:instalmentId/pay', (req: Request, res: Response) => {
     return res.status(400).json(response);
   }
 
-  targetInstalment.status = 'paid';
+  targetInstalment.status = "paid";
   targetInstalment.paidAt = new Date().toISOString();
 
   const excess = paid - targetInstalment.amount;
   targetPlan.totalRepaid += targetInstalment.amount;
   targetPlan.remainingBalance -= targetInstalment.amount;
   targetPlan.percentageComplete = Math.floor(
-    (targetPlan.totalRepaid / targetPlan.amountFinanced) * 100
+    (targetPlan.totalRepaid / targetPlan.amountFinanced) * 100,
   );
 
   if (excess > 0) {
-    const nextPending = targetPlan.instalments.find((i) => i.status === 'pending');
+    const nextPending = targetPlan.instalments.find(
+      (i) => i.status === "pending",
+    );
     if (nextPending) {
       nextPending.amount = Math.max(0, nextPending.amount - excess);
     }
   }
 
-  const allPaid = targetPlan.instalments.every((i) => i.status === 'paid');
+  const allPaid = targetPlan.instalments.every((i) => i.status === "paid");
   if (allPaid) {
-    targetPlan.status = 'completed';
+    targetPlan.status = "completed";
     targetPlan.percentageComplete = 100;
     targetPlan.remainingBalance = 0;
 
     const booking = bookings.find((b) => b.id === targetPlan!.bookingId);
-    if (booking) booking.status = 'completed';
+    if (booking) booking.status = "completed";
   }
 
   const wallet = wallets.find((w) => w.userId === targetPlan!.userId);
   if (wallet) {
     walletTransactions.push({
-      id: generateId('txn'),
+      id: generateId("txn"),
       walletId: wallet.id,
-      type: 'repayment',
+      type: "repayment",
       amount: paid,
       reference: `TK-REP-${Date.now()}`,
       description: `Instalment ${targetInstalment.instalmentNumber} for booking ${targetPlan.bookingId}`,
-      status: 'completed',
+      status: "completed",
       createdAt: new Date().toISOString(),
     });
   }
 
-  const bookingForTriplock = bookings.find((b) => b.id === targetPlan!.bookingId);
+  const bookingForTriplock = bookings.find(
+    (b) => b.id === targetPlan!.bookingId,
+  );
   const unlockMessage =
-    bookingForTriplock?.status === 'triplock' &&
+    bookingForTriplock?.status === "triplock" &&
     targetPlan.bookingUnlockThreshold &&
     targetPlan.percentageComplete >= targetPlan.bookingUnlockThreshold
-      ? 'Milestone reached! Your booking is being confirmed.'
+      ? "Milestone reached! Your booking is being confirmed."
       : undefined;
 
   if (unlockMessage && bookingForTriplock) {
-    bookingForTriplock.status = 'active';
+    bookingForTriplock.status = "active";
   }
 
   const response: ApiResponse<{
@@ -165,16 +182,18 @@ router.post('/instalments/:instalmentId/pay', (req: Request, res: Response) => {
     message?: string;
   }> = {
     success: true,
-    message: unlockMessage || 'Payment recorded successfully',
-    data: { instalment: targetInstalment, plan: targetPlan, message: unlockMessage },
+    message: unlockMessage || "Payment recorded successfully",
+    data: {
+      instalment: targetInstalment,
+      plan: targetPlan,
+      message: unlockMessage,
+    },
   };
   return res.status(200).json(response);
 });
 
-router.get('/reminders/:userId', (req: Request, res: Response) => {
-  const userPlans = repaymentPlans.filter(
-    (p) => p.userId === req.params.userId && p.status === 'active'
-  );
+router.get("/reminders/:userId", (req: Request, res: Response) => {
+  const userPlans = repaymentPlans.filter((p) => p.status === "active");
 
   const today = new Date();
   const in48h = new Date(today.getTime() + 48 * 60 * 60 * 1000);
@@ -187,12 +206,18 @@ router.get('/reminders/:userId', (req: Request, res: Response) => {
 
   for (const plan of userPlans) {
     for (const inst of plan.instalments) {
-      if (inst.status !== 'pending') continue;
+      if (inst.status !== "pending") continue;
       const due = new Date(inst.dueDate);
-      const hoursUntilDue = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60));
+      const hoursUntilDue = Math.floor(
+        (due.getTime() - today.getTime()) / (1000 * 60 * 60),
+      );
 
       if (hoursUntilDue <= 48) {
-        upcoming.push({ bookingId: plan.bookingId, instalment: inst, hoursUntilDue });
+        upcoming.push({
+          bookingId: plan.bookingId,
+          instalment: inst,
+          hoursUntilDue,
+        });
       }
     }
   }

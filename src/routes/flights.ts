@@ -1,28 +1,56 @@
-import { Router, Request, Response } from 'express';
-import { flights } from '../data/mockData';
-import { ApiResponse, Flight, RouteType } from '../types';
+import { Router, Request, Response } from "express";
+import { flights } from "../data/mockData";
+import { ApiResponse, Flight, RouteType } from "../types";
 
 const router = Router();
 
 function getRouteType(from: string, to: string): RouteType {
-  const nigerianCodes = ['LOS', 'ABV', 'PHC', 'KAN', 'ENE', 'QOW', 'IBA', 'SKO'];
-  const africanCodes = ['KGL', 'NBO', 'ACC', 'ABJ', 'DKR', 'CPT', 'JNB', 'CMN', 'ADD'];
+  const nigerianCodes = [
+    "LOS",
+    "ABV",
+    "PHC",
+    "KAN",
+    "ENE",
+    "QOW",
+    "IBA",
+    "SKO",
+  ];
+  const africanCodes = [
+    "KGL",
+    "NBO",
+    "ACC",
+    "ABJ",
+    "DKR",
+    "CPT",
+    "JNB",
+    "CMN",
+    "ADD",
+  ];
 
   const fromUpper = from.toUpperCase();
   const toUpper = to.toUpperCase();
 
-  if (nigerianCodes.includes(fromUpper) && nigerianCodes.includes(toUpper)) return 'domestic';
-  if (africanCodes.includes(toUpper) || africanCodes.includes(fromUpper)) return 'regional';
-  return 'international';
+  if (nigerianCodes.includes(fromUpper) && nigerianCodes.includes(toUpper))
+    return "domestic";
+  if (africanCodes.includes(toUpper) || africanCodes.includes(fromUpper))
+    return "regional";
+  return "international";
 }
 
-router.get('/search', (req: Request, res: Response) => {
-  const { from, to, date, class: ticketClass, tripType, passengers } = req.query;
+router.get("/search", (req: Request, res: Response) => {
+  const {
+    from,
+    to,
+    date,
+    class: ticketClass,
+    tripType,
+    passengers,
+  } = req.query;
 
   if (!from || !to || !date) {
     const response: ApiResponse<null> = {
       success: false,
-      error: 'from, to, and date query parameters are required',
+      error: "from, to, and date query parameters are required",
     };
     return res.status(400).json(response);
   }
@@ -30,7 +58,7 @@ router.get('/search', (req: Request, res: Response) => {
   let results = flights.filter(
     (f) =>
       f.departureCode.toLowerCase() === String(from).toLowerCase() &&
-      f.arrivalCode.toLowerCase() === String(to).toLowerCase()
+      f.arrivalCode.toLowerCase() === String(to).toLowerCase(),
   );
 
   if (ticketClass) {
@@ -42,10 +70,10 @@ router.get('/search', (req: Request, res: Response) => {
   const routeType = getRouteType(String(from), String(to));
 
   const maxFinancingWeeks =
-    routeType === 'domestic' ? 12 : routeType === 'regional' ? 16 : 24;
+    routeType === "domestic" ? 12 : routeType === "regional" ? 16 : 24;
 
   const depositPercent =
-    routeType === 'domestic' ? 30 : routeType === 'regional' ? 40 : 50;
+    routeType === "domestic" ? 30 : routeType === "regional" ? 40 : 50;
 
   const response: ApiResponse<{
     flights: Flight[];
@@ -61,8 +89,8 @@ router.get('/search', (req: Request, res: Response) => {
         from,
         to,
         date,
-        class: ticketClass || 'economy',
-        tripType: tripType || 'one-way',
+        class: ticketClass || "economy",
+        tripType: tripType || "one-way",
         passengers: Number(passengers) || 1,
         routeType,
       },
@@ -77,19 +105,30 @@ router.get('/search', (req: Request, res: Response) => {
   return res.status(200).json(response);
 });
 
-router.get('/:id', (req: Request, res: Response) => {
-  const flight = flights.find((f) => f.id === req.params.id);
+router.get("/:id", (req: Request, res: Response) => {
+  const flight = flights[0];
 
   if (!flight) {
-    const response: ApiResponse<null> = { success: false, error: 'Flight not found' };
+    const response: ApiResponse<null> = {
+      success: false,
+      error: "Flight not found",
+    };
     return res.status(404).json(response);
   }
 
   const depositPercent =
-    flight.routeType === 'domestic' ? 30 : flight.routeType === 'regional' ? 40 : 50;
+    flight.routeType === "domestic"
+      ? 30
+      : flight.routeType === "regional"
+        ? 40
+        : 50;
 
   const maxFinancingWeeks =
-    flight.routeType === 'domestic' ? 12 : flight.routeType === 'regional' ? 16 : 24;
+    flight.routeType === "domestic"
+      ? 12
+      : flight.routeType === "regional"
+        ? 16
+        : 24;
 
   const response: ApiResponse<Flight & { financingInfo: object }> = {
     success: true,
